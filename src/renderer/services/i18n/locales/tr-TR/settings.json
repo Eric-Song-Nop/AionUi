@@ -145,6 +145,7 @@
   "language": "Dil",
   "closeToTray": "Tepsiye Kapat",
   "notification": "Bildirimler",
+  "acpNotificationEnabled": "ACP Yanıt Tamamlanma",
   "cronNotificationEnabled": "Zamanlanmış Görev Tamamlanma",
   "gemini": "Gemini",
   "model": "Model",

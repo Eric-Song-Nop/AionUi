@@ -19,5 +19,12 @@
   "config": {
     "reasoning_effort": "Akıl Yürütme Çabası",
     "default": "Varsayılan"
+  },
+  "notification": {
+    "responseComplete": "{{title}} - Yanıt tamamlandı",
+    "responseFailed": "{{title}} - Yanıt başarısız oldu",
+    "openConversation": "Konuşmayı açmak için tıklayın",
+    "reviewConversation": "Konuşmayı gözden geçirmek için tıklayın",
+    "defaultConversationTitle": "Konuşma"
   }
 }

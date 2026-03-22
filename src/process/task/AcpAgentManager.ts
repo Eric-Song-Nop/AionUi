@@ -16,6 +16,8 @@ import type {
 } from '@/common/types/acpTypes';
 import { ACP_BACKENDS_ALL } from '@/common/types/acpTypes';
 import { ExtensionRegistry } from '@process/extensions';
+import { showNotification } from '@process/bridge/notificationBridge';
+import i18n, { i18nReady } from '@process/services/i18n';
 import { getDatabase } from '@process/services/database';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { addMessage, addOrUpdateMessage, nextTickToLocalFinish } from '@process/utils/message';
@@ -77,6 +79,9 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
   private acpAvailableSlashWaiters: Array<(commands: SlashCommandItem[]) => void> = [];
   private readonly streamDbFlushIntervalMs = 120;
   private readonly bufferedStreamTextMessages = new Map<string, BufferedStreamTextMessage>();
+  private turnProducedVisibleOutput = false;
+  private turnEndedWithError = false;
+  private suppressTurnCompletionNotification = false;
 
   constructor(data: AcpAgentManagerData) {
     super('acp', data, new IpcAgentEventEmitter());
@@ -92,6 +97,87 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
 
   private makeStreamBufferKey(message: Extract<TMessage, { type: 'text' }>): string {
     return `${message.conversation_id}:${message.msg_id || message.id}`;
+  }
+
+  private resetTurnCompletionState(): void {
+    this.turnProducedVisibleOutput = false;
+    this.turnEndedWithError = false;
+    this.suppressTurnCompletionNotification = false;
+  }
+
+  private markTurnCompletionState(message: IResponseMessage): void {
+    if (message.type === 'content' || message.type === 'plan') {
+      this.turnProducedVisibleOutput = true;
+    }
+
+    if (message.type === 'error') {
+      this.turnEndedWithError = true;
+    }
+
+    if (message.type === 'agent_status') {
+      const status = (message.data as { status?: string } | null)?.status;
+      if (status === 'error') {
+        this.turnEndedWithError = true;
+      }
+      if (status === 'disconnected') {
+        this.suppressTurnCompletionNotification = true;
+      }
+    }
+  }
+
+  private getConversationNotificationTitle(): string {
+    const defaultTitle = i18n.t('acp.notification.defaultConversationTitle');
+
+    try {
+      const result = getDatabase().getConversation(this.conversation_id);
+      if (!result.success || !result.data) {
+        return defaultTitle;
+      }
+
+      const title = result.data.name?.trim();
+      return title || defaultTitle;
+    } catch {
+      return defaultTitle;
+    }
+  }
+
+  private async notifyTurnCompletionIfNeeded(): Promise<void> {
+    const shouldNotify =
+      !this.suppressTurnCompletionNotification && (this.turnEndedWithError || this.turnProducedVisibleOutput);
+    const isError = this.turnEndedWithError;
+
+    this.resetTurnCompletionState();
+
+    if (!shouldNotify) {
+      return;
+    }
+
+    const [notificationEnabled, acpNotificationEnabled] = await Promise.all([
+      ProcessConfig.get('system.notificationEnabled'),
+      ProcessConfig.get('system.acpNotificationEnabled'),
+    ]);
+
+    if (notificationEnabled === false || acpNotificationEnabled === false) {
+      return;
+    }
+
+    await i18nReady;
+
+    const conversationTitle = this.getConversationNotificationTitle();
+    const title = isError
+      ? i18n.t('acp.notification.responseFailed', { title: conversationTitle })
+      : i18n.t('acp.notification.responseComplete', { title: conversationTitle });
+    const body = isError ? i18n.t('acp.notification.reviewConversation') : i18n.t('acp.notification.openConversation');
+
+    try {
+      await showNotification({
+        title,
+        body,
+        conversationId: this.conversation_id,
+      });
+    } catch (error) {
+      mainWarn('[AcpAgentManager]', 'Failed to show ACP completion notification', error);
+    }
   }
 
   private queueBufferedStreamTextMessage(message: Extract<TMessage, { type: 'text' }>, backend: AcpBackend): void {
@@ -290,6 +376,7 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
         },
         onStreamEvent: (message) => {
           const pipelineStart = Date.now();
+          this.markTurnCompletionState(message);
 
           // Reduce status noise: show full lifecycle only for the first turn.
           // After first turn, only keep failure statuses to avoid reconnect chatter.
@@ -438,9 +525,12 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
             cronBusyGuard.setProcessing(this.conversation_id, false);
           }
 
+          const isCronContinuation =
+            v.type === 'finish' && Boolean(this.currentMsgContent) && hasCronCommands(this.currentMsgContent);
+
           // Process cron commands when turn ends (finish signal)
           // ACP streams content in chunks, so we check the accumulated content here
-          if (v.type === 'finish' && this.currentMsgContent && hasCronCommands(this.currentMsgContent)) {
+          if (isCronContinuation) {
             const message: TMessage = {
               id: this.currentMsgId || uuid(),
               msg_id: this.currentMsgId || uuid(),
@@ -467,11 +557,13 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
             // Send collected responses back to AI agent so it can continue
             if (collectedResponses.length > 0 && this.agent) {
               const feedbackMessage = `[System Response]\n${collectedResponses.join('\n')}`;
+              this.resetTurnCompletionState();
               await this.agent.sendMessage({ content: feedbackMessage });
             }
             // Reset after processing
             this.currentMsgId = null;
             this.currentMsgContent = '';
+            this.resetTurnCompletionState();
           }
 
           ipcBridge.acpConversation.responseStream.emit(v);
@@ -481,6 +573,10 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
             ...(v as any),
             conversation_id: this.conversation_id,
           });
+
+          if (v.type === 'finish' && !isCronContinuation) {
+            await this.notifyTurnCompletionIfNeeded();
+          }
         },
       });
       return this.agent.start().then(async () => {
@@ -545,6 +641,7 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
     message?: string;
   }> {
     const managerSendStart = Date.now();
+    this.resetTurnCompletionState();
     // Mark conversation as busy to prevent cron jobs from running
     cronBusyGuard.setProcessing(this.conversation_id, true);
     // Set status to running when message is being processed
@@ -626,6 +723,7 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
       this.flushBufferedStreamTextMessages();
       cronBusyGuard.setProcessing(this.conversation_id, false);
       this.status = 'finished';
+      this.turnEndedWithError = true;
       const message: IResponseMessage = {
         type: 'error',
         conversation_id: this.conversation_id,
@@ -651,6 +749,7 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
         data: null,
       };
       ipcBridge.acpConversation.responseStream.emit(finishMessage);
+      await this.notifyTurnCompletionIfNeeded();
 
       return new Promise((_, reject) => {
         nextTickToLocalFinish(() => {
@@ -774,6 +873,7 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
    * It directly creates AcpAgent in the main process, so we need to call agent.stop() directly.
    */
   async stop() {
+    this.resetTurnCompletionState();
     if (this.agent) {
       return this.agent.stop();
     }

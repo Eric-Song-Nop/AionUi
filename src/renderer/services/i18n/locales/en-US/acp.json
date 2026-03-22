@@ -19,5 +19,12 @@
   "config": {
     "reasoning_effort": "Reasoning Effort",
     "default": "Default"
+  },
+  "notification": {
+    "responseComplete": "{{title}} - Response complete",
+    "responseFailed": "{{title}} - Response failed",
+    "openConversation": "Click to open the conversation",
+    "reviewConversation": "Click to review the conversation",
+    "defaultConversationTitle": "Conversation"
   }
 }

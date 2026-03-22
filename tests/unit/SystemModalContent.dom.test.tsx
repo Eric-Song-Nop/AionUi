@@ -69,9 +69,11 @@ const mockOpenDevTools = vi.fn();
 const mockDevToolsStateChangedOn = vi.fn(() => vi.fn());
 const mockGetCloseToTray = vi.fn();
 const mockGetNotificationEnabled = vi.fn();
+const mockGetAcpNotificationEnabled = vi.fn();
 const mockGetCronNotificationEnabled = vi.fn();
 const mockSetCloseToTray = vi.fn();
 const mockSetNotificationEnabled = vi.fn();
+const mockSetAcpNotificationEnabled = vi.fn();
 const mockSetCronNotificationEnabled = vi.fn();
 const mockOpenFile = vi.fn();
 const mockShowOpen = vi.fn();
@@ -92,9 +94,11 @@ vi.mock('@/common', () => ({
     systemSettings: {
       getCloseToTray: { invoke: (...args: any[]) => mockGetCloseToTray(...args) },
       getNotificationEnabled: { invoke: (...args: any[]) => mockGetNotificationEnabled(...args) },
+      getAcpNotificationEnabled: { invoke: (...args: any[]) => mockGetAcpNotificationEnabled(...args) },
       getCronNotificationEnabled: { invoke: (...args: any[]) => mockGetCronNotificationEnabled(...args) },
       setCloseToTray: { invoke: (...args: any[]) => mockSetCloseToTray(...args) },
       setNotificationEnabled: { invoke: (...args: any[]) => mockSetNotificationEnabled(...args) },
+      setAcpNotificationEnabled: { invoke: (...args: any[]) => mockSetAcpNotificationEnabled(...args) },
       setCronNotificationEnabled: { invoke: (...args: any[]) => mockSetCronNotificationEnabled(...args) },
     },
     dialog: {
@@ -179,6 +183,7 @@ describe('SystemModalContent', () => {
     mockIsDevToolsOpened.mockResolvedValue(false);
     mockGetCloseToTray.mockResolvedValue(false);
     mockGetNotificationEnabled.mockResolvedValue(true);
+    mockGetAcpNotificationEnabled.mockResolvedValue(true);
     mockGetCronNotificationEnabled.mockResolvedValue(false);
   });
 
@@ -191,6 +196,26 @@ describe('SystemModalContent', () => {
 
     expect(screen.getByText('settings.language')).toBeInTheDocument();
     expect(screen.getByText('settings.closeToTray')).toBeInTheDocument();
+  });
+
+  it('should render and toggle ACP completion notifications', async () => {
+    mockSetAcpNotificationEnabled.mockResolvedValue(undefined);
+
+    render(<SystemModalContent />);
+
+    const acpNotificationLabel = await screen.findByText('settings.acpNotificationEnabled');
+    const acpNotificationRow = acpNotificationLabel.parentElement?.parentElement;
+    const acpNotificationSwitch = acpNotificationRow?.querySelector('button[role="switch"]');
+
+    expect(acpNotificationSwitch).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(acpNotificationSwitch!);
+    });
+
+    await waitFor(() => {
+      expect(mockSetAcpNotificationEnabled).toHaveBeenCalledWith({ enabled: false });
+    });
   });
 
   it('should render DevTools toggle button', async () => {

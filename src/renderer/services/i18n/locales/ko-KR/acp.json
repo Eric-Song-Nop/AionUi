@@ -19,5 +19,12 @@
   "config": {
     "reasoning_effort": "추론 깊이",
     "default": "기본값"
+  },
+  "notification": {
+    "responseComplete": "{{title}} - 응답 완료",
+    "responseFailed": "{{title}} - 응답 실패",
+    "openConversation": "클릭하여 대화를 열기",
+    "reviewConversation": "클릭하여 대화를 확인하기",
+    "defaultConversationTitle": "대화"
   }
 }

@@ -19,5 +19,12 @@
   "config": {
     "reasoning_effort": "推理深度",
     "default": "預設"
+  },
+  "notification": {
+    "responseComplete": "{{title}} - 回應已完成",
+    "responseFailed": "{{title}} - 回應失敗",
+    "openConversation": "點擊開啟會話",
+    "reviewConversation": "點擊查看會話",
+    "defaultConversationTitle": "會話"
   }
 }

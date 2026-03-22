@@ -145,6 +145,7 @@
   "language": "Language",
   "closeToTray": "Close to Tray",
   "notification": "Notifications",
+  "acpNotificationEnabled": "ACP Response Completion",
   "cronNotificationEnabled": "Scheduled Task Completion",
   "gemini": "Gemini",
   "model": "Model",

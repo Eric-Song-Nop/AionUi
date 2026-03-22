@@ -145,6 +145,7 @@
   "language": "语言",
   "closeToTray": "关闭到托盘",
   "notification": "通知",
+  "acpNotificationEnabled": "ACP 响应完成通知",
   "cronNotificationEnabled": "定时任务完成通知",
   "gemini": "Gemini",
   "model": "模型",

@@ -581,6 +581,10 @@ export const systemSettings = {
   setCloseToTray: bridge.buildProvider<void, { enabled: boolean }>('system-settings:set-close-to-tray'),
   getNotificationEnabled: bridge.buildProvider<boolean, void>('system-settings:get-notification-enabled'),
   setNotificationEnabled: bridge.buildProvider<void, { enabled: boolean }>('system-settings:set-notification-enabled'),
+  getAcpNotificationEnabled: bridge.buildProvider<boolean, void>('system-settings:get-acp-notification-enabled'),
+  setAcpNotificationEnabled: bridge.buildProvider<void, { enabled: boolean }>(
+    'system-settings:set-acp-notification-enabled'
+  ),
   getCronNotificationEnabled: bridge.buildProvider<boolean, void>('system-settings:get-cron-notification-enabled'),
   setCronNotificationEnabled: bridge.buildProvider<void, { enabled: boolean }>(
     'system-settings:set-cron-notification-enabled'

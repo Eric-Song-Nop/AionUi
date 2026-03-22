@@ -66,6 +66,17 @@ export function initSystemSettingsBridge(): void {
     await ProcessConfig.set('system.notificationEnabled', enabled);
   });
 
+  // 获取"ACP 响应完成通知"设置 / Get "ACP response completion notification" setting
+  ipcBridge.systemSettings.getAcpNotificationEnabled.provider(async () => {
+    const value = await ProcessConfig.get('system.acpNotificationEnabled');
+    return value ?? true; // 默认开启 / Default enabled
+  });
+
+  // 设置"ACP 响应完成通知" / Set "ACP response completion notification"
+  ipcBridge.systemSettings.setAcpNotificationEnabled.provider(async ({ enabled }) => {
+    await ProcessConfig.set('system.acpNotificationEnabled', enabled);
+  });
+
   // 获取"定时任务通知"设置 / Get "scheduled task notification" setting
   ipcBridge.systemSettings.getCronNotificationEnabled.provider(async () => {
     const value = await ProcessConfig.get('system.cronNotificationEnabled');

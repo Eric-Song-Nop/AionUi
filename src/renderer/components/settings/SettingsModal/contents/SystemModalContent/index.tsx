@@ -35,6 +35,7 @@ const SystemModalContent: React.FC = () => {
 
   const [closeToTray, setCloseToTray] = useState(false);
   const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const [acpNotificationEnabled, setAcpNotificationEnabled] = useState(true);
   const [cronNotificationEnabled, setCronNotificationEnabled] = useState(false);
 
   useEffect(() => {
@@ -48,6 +49,13 @@ const SystemModalContent: React.FC = () => {
     ipcBridge.systemSettings.getNotificationEnabled
       .invoke()
       .then((enabled) => setNotificationEnabled(enabled))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    ipcBridge.systemSettings.getAcpNotificationEnabled
+      .invoke()
+      .then((enabled) => setAcpNotificationEnabled(enabled))
       .catch(() => {});
   }, []);
 
@@ -69,6 +77,13 @@ const SystemModalContent: React.FC = () => {
     setNotificationEnabled(checked);
     ipcBridge.systemSettings.setNotificationEnabled.invoke({ enabled: checked }).catch(() => {
       setNotificationEnabled(!checked);
+    });
+  }, []);
+
+  const handleAcpNotificationEnabledChange = useCallback((checked: boolean) => {
+    setAcpNotificationEnabled(checked);
+    ipcBridge.systemSettings.setAcpNotificationEnabled.invoke({ enabled: checked }).catch(() => {
+      setAcpNotificationEnabled(!checked);
     });
   }, []);
 
@@ -190,6 +205,13 @@ const SystemModalContent: React.FC = () => {
                 }
               >
                 <div className='pl-12px'>
+                  <PreferenceRow label={t('settings.acpNotificationEnabled')}>
+                    <Switch
+                      checked={acpNotificationEnabled}
+                      disabled={!notificationEnabled}
+                      onChange={handleAcpNotificationEnabledChange}
+                    />
+                  </PreferenceRow>
                   <PreferenceRow label={t('settings.cronNotificationEnabled')}>
                     <Switch
                       checked={cronNotificationEnabled}
