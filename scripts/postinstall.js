@@ -3,16 +3,43 @@
  * Handles native module installation for different environments
  */
 
-const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+const { rebuildWithElectronRebuild } = require('./rebuildNativeModules');
 
 // Note: web-tree-sitter is now a direct dependency in package.json
 // No need for symlinks or copying - npm will install it directly to node_modules
+
+const UNUSED_PTY_PACKAGE_PATHS = [
+  'node_modules/node-pty',
+  'node_modules/@lydell/node-pty',
+  'node_modules/@lydell/node-pty-darwin-arm64',
+  'node_modules/@lydell/node-pty-darwin-x64',
+  'node_modules/@lydell/node-pty-linux-arm64',
+  'node_modules/@lydell/node-pty-linux-x64',
+  'node_modules/@lydell/node-pty-win32-arm64',
+  'node_modules/@lydell/node-pty-win32-x64',
+];
+
+function removeUnusedPtyPackages(projectRoot) {
+  for (const relativePath of UNUSED_PTY_PACKAGE_PATHS) {
+    const absolutePath = path.join(projectRoot, relativePath);
+    if (!fs.existsSync(absolutePath)) {
+      continue;
+    }
+
+    fs.rmSync(absolutePath, { recursive: true, force: true });
+    console.log(`Removed unused PTY package: ${relativePath}`);
+  }
+}
 
 function runPostInstall() {
   try {
     // Check if we're in a CI environment
     const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
     const electronVersion = require('../package.json').devDependencies.electron.replace(/^[~^]/, '');
+    const projectRoot = path.resolve(__dirname, '..');
 
     console.log(`Environment: CI=${isCI}, Electron=${electronVersion}`);
 
@@ -22,16 +49,19 @@ function runPostInstall() {
       console.log('CI environment detected, skipping rebuild to use prebuilt binaries');
       console.log('Native modules will be handled by electron-forge during packaging');
     } else {
-      // In local environment, use electron-builder to install dependencies
-      console.log('Local environment, installing app deps');
-      execSync('bunx electron-builder install-app-deps', {
-        stdio: 'inherit',
-        env: {
-          ...process.env,
-          npm_config_build_from_source: 'true',
-        },
+      // AionUi only needs better-sqlite3 rebuilt for Electron.
+      // PTY-backed shell execution is intentionally disabled, so do not
+      // install optional node-pty variants from aioncli-core here.
+      console.log('Local environment, rebuilding required native modules');
+      rebuildWithElectronRebuild({
+        platform: process.platform,
+        arch: process.arch,
+        electronVersion,
+        cwd: projectRoot,
       });
     }
+
+    removeUnusedPtyPackages(projectRoot);
   } catch (e) {
     console.error('Postinstall failed:', e.message);
     // Don't exit with error code to avoid breaking installation

@@ -282,6 +282,10 @@ export async function loadCliConfig({
     // AionUi 是桌面应用，支持用户交互确认，需要设置 interactive: true
     // AionUi is a desktop app with user interaction support, needs interactive: true
     interactive: true,
+    // AionUi does not support PTY-backed shell execution. Force aioncli-core
+    // to stay on the child_process path even if upstream defaults change.
+    ptyInfo: 'child_process',
+    enableInteractiveShell: false,
     showMemoryUsage: argv.showMemoryUsage || argv.show_memory_usage || settings.showMemoryUsage || false,
     accessibility: settings.accessibility,
     telemetry: {
